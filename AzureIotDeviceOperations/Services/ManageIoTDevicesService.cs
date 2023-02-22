@@ -70,7 +70,7 @@ namespace AzureIotDeviceOperations.Services
             {
                 if (isIoTEdge)
                 {
-                    device = new Device("such-edge");
+                    device = new Device(deviceName);
                     device.Capabilities = new Microsoft.Azure.Devices.Shared.DeviceCapabilities()
                     {
                         IotEdge = true
