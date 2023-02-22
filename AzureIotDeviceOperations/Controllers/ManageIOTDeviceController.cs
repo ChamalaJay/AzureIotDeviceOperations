@@ -1,19 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
 using AzureIotDeviceOperations.Services;
-using Azure;
-using Microsoft.AspNetCore.SignalR;
-using Microsoft.Azure.Amqp.Framing;
-using Microsoft.Azure.Devices.Shared;
-using Microsoft.Azure.Devices;
-using Microsoft.VisualBasic;
-using static System.Net.Mime.MediaTypeNames;
-using static System.Net.WebRequestMethods;
-using System.ComponentModel;
-using System.Net.Sockets;
-using System.Reflection.Metadata;
-using System.Runtime.Intrinsics.X86;
-using System;
 
 namespace AzureIotDeviceOperations.Controllers
 {
