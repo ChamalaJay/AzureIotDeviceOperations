@@ -7,91 +7,123 @@ namespace AzureIotDeviceOperations.Services
 {
     public class ManageIOTDeviceCommunicationService
     {
-        private static string? deviceKey;
-        private static DeviceClient? deviceClient;
-        private static RegistryManager? registryManager;
-        private static string iotHubUri = "Iot-hub-az-220-1.azure-devices.net";
-        private static string iotHubConnectionString = "HostName=Iot-hub-az-220-1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=9jR45iUCxtiBCVCPwDBIeJ3TeFQrVDAvtHp0os7ghEg=";
+        static string DeviceConnectionString = "HostName=<yourIotHubName>.azure-devices.net;DeviceId=<yourIotDeviceName>;SharedAccessKey=<yourIotDeviceAccessKey>";
+        static DeviceClient Client = null;
+        static RegistryManager registryManager;
+        static string iotHubConnectionString = "{iot hub connection string}";
 
         public ManageIOTDeviceCommunicationService(IConfiguration configuration)
         {
 
         }
-        
-        public static DeviceClient AddDevice(string deviceName, bool isIoTEdge)
+
+        public static async void InitClient()
         {
-            RegisterDeviceAsync(deviceName, isIoTEdge).Wait();
-
-            deviceClient = DeviceClient.Create(iotHubUri, new DeviceAuthenticationWithRegistrySymmetricKey(deviceName, deviceKey));
-
-            return deviceClient;
-        }
-
-        public async static Task<IEnumerable<string>> GetDevicesAsync(int deviceCount)
-        {
-            var jsons = new List<string>();
-
-            var registryManager = RegistryManager.CreateFromConnectionString(iotHubConnectionString);
-
-            var query = registryManager.CreateQuery("SELECT * FROM devices;");
-            while (query.HasMoreResults)
-            {
-                var page = await query.GetNextAsJsonAsync();
-                foreach (var json in page)
-                {
-                    jsons.Add(json);
-                }
-            }
-
-            return jsons;
-
-        }
-
-        public async static Task<Device> GetDevice(string deviceId)
-        {
-
-            var registryManager = RegistryManager.CreateFromConnectionString(iotHubConnectionString);
-
-
-           var res = await registryManager.GetDeviceAsync(deviceId);
-
-            return res;
-        }
-
-        public async static Task RemoveDevice(string deviceId)
-        {
-
-            var registryManager = RegistryManager.CreateFromConnectionString(iotHubConnectionString);
-
-            await registryManager.RemoveDeviceAsync(deviceId);
-
-        }
-
-        private static async Task RegisterDeviceAsync(string deviceName, bool isIoTEdge)
-        {
-            Device? device;
-            registryManager = RegistryManager.CreateFromConnectionString(iotHubConnectionString);
             try
             {
-                if (isIoTEdge)
-                {
-                    device = new Device("such-edge");
-                    device.Capabilities = new Microsoft.Azure.Devices.Shared.DeviceCapabilities()
-                    {
-                        IotEdge = true
-                    };
-                    await registryManager.AddDeviceAsync(device);
-                }
-                else
-                {
-                    device = await registryManager.AddDeviceAsync(new Device(deviceName));
-                }
+                Client = DeviceClient.CreateFromConnectionString(DeviceConnectionString,
+                  TransportType.Mqtt);
+                await Client.GetTwinAsync();
             }
-            catch (DeviceAlreadyExistsException)
+            catch (Exception ex)
             {
-                device = await registryManager.GetDeviceAsync(deviceName);
+                Console.WriteLine();
+                Console.WriteLine("Error in sample: {0}", ex.Message);
             }
-            deviceKey = device.Authentication.SymmetricKey.PrimaryKey;
+        }
+
+        public static async void ReportConnectivity()
+        {
+            try
+            {
+
+                TwinCollection reportedProperties, connectivity;
+                reportedProperties = new TwinCollection();
+                connectivity = new TwinCollection();
+                connectivity["type"] = "cellular";
+                reportedProperties["connectivity"] = connectivity;
+                await Client.UpdateReportedPropertiesAsync(reportedProperties);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public static async Task AddTagsAndQuery()
+        {
+            registryManager = RegistryManager.CreateFromConnectionString(iotHubConnectionString);
+            var twin = await registryManager.GetTwinAsync("myDeviceId");
+            var patch =
+                @"{
+            tags: {
+                location: {
+                    region: 'US',
+                    plant: 'Redmond43'
+                }
+            }
+        }";
+            await registryManager.UpdateTwinAsync(twin.DeviceId, patch, twin.ETag);
+
+            var query = registryManager.CreateQuery(
+              "SELECT * FROM devices WHERE tags.location.plant = 'Redmond43'", 100);
+            var twinsInRedmond43 = await query.GetNextAsTwinAsync();
+            
+
+            query = registryManager.CreateQuery("SELECT * FROM devices WHERE tags.location.plant = 'Redmond43' AND properties.reported.connectivity.type = 'cellular'", 100);
+            var twinsInRedmond43UsingCellular = await query.GetNextAsTwinAsync();
+            
+        }
+
+        private static async void SendDeviceToCloudMessagesAsync(DeviceClient s_deviceClient)
+        {
+            try
+            {
+
+                double minTemperature = 20;
+                double minHumidity = 60;
+                Random rand = new Random();
+
+                int messageCount = 0;
+
+                while (messageCount <= 10)
+                {
+                    double currentTemperature = minTemperature + rand.NextDouble() * 15;
+                    double currentHumidity = minHumidity + rand.NextDouble() * 20;
+
+                    // Create JSON message  
+
+                    var telemetryDataPoint = new
+                    {
+
+                        temperature = currentTemperature,
+                        humidity = currentHumidity
+                    };
+
+                    string messageString = "";
+
+
+
+                    messageString = JsonConvert.SerializeObject(telemetryDataPoint);
+
+                    var message = new Message(Encoding.ASCII.GetBytes(messageString));
+
+                    // Add a custom application property to the message.  
+                    // An IoT hub can filter on these properties without access to the message body.  
+                    //message.Properties.Add("temperatureAlert", (currentTemperature > 30) ? "true" : "false");  
+
+                    // Send the telemetry message  
+                    await s_deviceClient.SendEventAsync(message);
+                    
+                    await Task.Delay(1000 * 10);
+                    messageCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
         }
     }
 }
