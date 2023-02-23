@@ -1,46 +1,49 @@
 ﻿using Microsoft.Azure.Devices;
 using Microsoft.Azure.Devices.Client;
 using Microsoft.Azure.Devices.Common.Exceptions;
+using Microsoft.Azure.Devices.Shared;
+using Newtonsoft.Json;
 using System.Collections;
+using System.Text;
+using TransportType = Microsoft.Azure.Devices.Client.TransportType;
 
 namespace AzureIotDeviceOperations.Services
 {
     public class ManageIOTDeviceCommunicationService
     {
-        static string DeviceConnectionString = "HostName=<yourIotHubName>.azure-devices.net;DeviceId=<yourIotDeviceName>;SharedAccessKey=<yourIotDeviceAccessKey>";
+        static string DeviceConnectionString = "HostName=Iot-hub-az-220-1.azure-devices.net;DeviceId=Iot-Device-1;SharedAccessKey=El07BxYkpbQVR1zu4TwY2r+SIEJ2X4yigNeN5Fhr68Q=";
         static DeviceClient Client = null;
         static RegistryManager registryManager;
-        static string iotHubConnectionString = "{iot hub connection string}";
+        static string iotHubConnectionString = "HostName=Iot-hub-az-220-1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=9jR45iUCxtiBCVCPwDBIeJ3TeFQrVDAvtHp0os7ghEg=";
 
         public ManageIOTDeviceCommunicationService(IConfiguration configuration)
         {
 
         }
 
-        public static async void InitClient()
+        public static async Task<Twin> GetDeviceTwin(string DeviceId)
         {
             try
             {
-                Client = DeviceClient.CreateFromConnectionString(DeviceConnectionString,
-                  TransportType.Mqtt);
-                await Client.GetTwinAsync();
+                registryManager = RegistryManager.CreateFromConnectionString(iotHubConnectionString);
+                var twin = await registryManager.GetTwinAsync(DeviceId);
+                return twin;
             }
             catch (Exception ex)
             {
-                Console.WriteLine();
-                Console.WriteLine("Error in sample: {0}", ex.Message);
+                throw ex;
             }
         }
 
-        public static async void ReportConnectivity()
+        public static async void UpdateReportedProperties()
         {
             try
             {
-
+                Client = DeviceClient.CreateFromConnectionString(DeviceConnectionString, TransportType.Mqtt);
                 TwinCollection reportedProperties, connectivity;
                 reportedProperties = new TwinCollection();
                 connectivity = new TwinCollection();
-                connectivity["type"] = "cellular";
+                connectivity["type"] = "demo";
                 reportedProperties["connectivity"] = connectivity;
                 await Client.UpdateReportedPropertiesAsync(reportedProperties);
             }
@@ -50,36 +53,32 @@ namespace AzureIotDeviceOperations.Services
             }
         }
 
-        public static async Task AddTagsAndQuery()
+        public static async Task<IEnumerable<Twin>> AddTagsAndQueryDevice(string DeviceId)
         {
             registryManager = RegistryManager.CreateFromConnectionString(iotHubConnectionString);
-            var twin = await registryManager.GetTwinAsync("myDeviceId");
+            var twin = await registryManager.GetTwinAsync(DeviceId);
             var patch =
                 @"{
-            tags: {
-                location: {
-                    region: 'US',
-                    plant: 'Redmond43'
-                }
-            }
-        }";
+                    tags: {
+                        location: {
+                            region: 'IN',
+                            plant: 'LTIM'
+                        }
+                    }
+                }";
             await registryManager.UpdateTwinAsync(twin.DeviceId, patch, twin.ETag);
 
-            var query = registryManager.CreateQuery(
-              "SELECT * FROM devices WHERE tags.location.plant = 'Redmond43'", 100);
-            var twinsInRedmond43 = await query.GetNextAsTwinAsync();
-            
-
-            query = registryManager.CreateQuery("SELECT * FROM devices WHERE tags.location.plant = 'Redmond43' AND properties.reported.connectivity.type = 'cellular'", 100);
-            var twinsInRedmond43UsingCellular = await query.GetNextAsTwinAsync();
-            
+            var query = registryManager.CreateQuery("SELECT * FROM devices WHERE tags.location.plant = 'LTIM' AND properties.reported.connectivity.type = 'demo'", 100);
+            var updatedTwin = await query.GetNextAsTwinAsync();
+            return updatedTwin;
         }
 
-        private static async void SendDeviceToCloudMessagesAsync(DeviceClient s_deviceClient)
+        public static async void SendDeviceToCloudMessagesAsync()
         {
             try
             {
-
+                DeviceClient s_deviceClient = DeviceClient.CreateFromConnectionString(DeviceConnectionString,
+                  TransportType.Mqtt);
                 double minTemperature = 20;
                 double minHumidity = 60;
                 Random rand = new Random();
@@ -102,11 +101,9 @@ namespace AzureIotDeviceOperations.Services
 
                     string messageString = "";
 
-
-
                     messageString = JsonConvert.SerializeObject(telemetryDataPoint);
 
-                    var message = new Message(Encoding.ASCII.GetBytes(messageString));
+                    var message = new Microsoft.Azure.Devices.Client.Message(Encoding.ASCII.GetBytes(messageString));
 
                     // Add a custom application property to the message.  
                     // An IoT hub can filter on these properties without access to the message body.  

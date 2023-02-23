@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
 using AzureIotDeviceOperations.Services;
+using Microsoft.Azure.Devices;
 
 namespace AzureIotDeviceOperations.Controllers
 {
@@ -16,12 +17,12 @@ namespace AzureIotDeviceOperations.Controllers
 
         }
         [HttpGet]
-        [Route("~/[controller]/GetDevices")]
-        public async Task<ActionResult> Get(int deviceCount = 10)
+        [Route("~/[controller]/GetDeviceTwin")]
+        public async Task<ActionResult> Get(string deviceName)
         {
             try
             {
-                var devices = await ManageIoTDevicesService.GetDevicesAsync(deviceCount);
+                var devices = await ManageIOTDeviceCommunicationService.GetDeviceTwin(deviceName);
                 return Ok(devices);
             }
             catch (Exception ex)
@@ -31,28 +32,27 @@ namespace AzureIotDeviceOperations.Controllers
         }
 
         [HttpGet]
-        [Route("~/[controller]/DeviceDetails")]
-        public async Task<ActionResult> Details(string deviceId)
+        [Route("~/[controller]/UpdateReportedProperties")]
+        public ActionResult UpdateReportedProperties(string deviceId)
         {
-            var device = await ManageIoTDevicesService.GetDevice(deviceId);
+            ManageIOTDeviceCommunicationService.UpdateReportedProperties();
+            return Ok(true);
+        }
+
+        [HttpPost]
+        [Route("~/[controller]/AddTagsAndQueryDevice")]
+        public async Task<ActionResult> AddTagsAndQueryDevice(string deviceName)
+        {
+            var device = await ManageIOTDeviceCommunicationService.AddTagsAndQueryDevice(deviceName);
+
             return Ok(device);
         }
 
         [HttpPost]
-        [Route("~/[controller]/CreateDevice")]
-        public ActionResult Create(string deviceName, bool isIoTEdge = false)
+        [Route("~/[controller]/SendTelemetryMessages")]
+        public ActionResult SendTelemetryMessagesFromDevice(string deviceId)
         {
-            // Register Device with Azure
-            var device = ManageIoTDevicesService.AddDevice(deviceName, isIoTEdge);
-
-            return Ok(device);
-        }
-
-        [HttpDelete]
-        [Route("~/[controller]/DeleteDevice")]
-        public ActionResult Delete(string deviceId)
-        {
-            ManageIoTDevicesService.RemoveDevice(deviceId).Wait();
+            ManageIOTDeviceCommunicationService.SendDeviceToCloudMessagesAsync();
             return Ok();
         }
     }
