@@ -34,7 +34,7 @@ namespace AzureIotDeviceOperations.Controllers
         [Route("~/[controller]/DeviceDetails")]
         public async Task<ActionResult> Details(string deviceId)
         {
-            var device = await ManageIoTDevicesService.GetDevicesAsync(1);
+            var device = await ManageIoTDevicesService.GetDevice(deviceId);
             return Ok(device);
         }
 

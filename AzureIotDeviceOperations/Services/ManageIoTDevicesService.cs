@@ -10,9 +10,9 @@ namespace AzureIotDeviceOperations.Services
         private static string? deviceKey;
         private static DeviceClient? deviceClient;
         private static RegistryManager? registryManager;
-        private static string iotHubUri = "Iot-hub-az-220-1.azure-devices.net";
-        private static string iotHubConnectionString = "HostName=Iot-hub-az-220-1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=9jR45iUCxtiBCVCPwDBIeJ3TeFQrVDAvtHp0os7ghEg=";
-        
+        private static string iotHubUri = "MyLTIIoTHub1.azure-devices.net";
+        private static string iotHubConnectionString = "HostName=MyLTIIoTHub1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=esSPnN7iSskx/Y9m4PoVeZyY/OBBlqCFw+kcHLwbV+c=";
+
         public static DeviceClient AddDevice(string deviceName, bool isIoTEdge)
         {
             RegisterDeviceAsync(deviceName, isIoTEdge).Wait();
@@ -22,23 +22,24 @@ namespace AzureIotDeviceOperations.Services
             return deviceClient;
         }
 
-        public async static Task<IEnumerable<string>> GetDevicesAsync(int deviceCount)
+        public async static Task<IEnumerable<Device>> GetDevicesAsync(int deviceCount)
         {
             var jsons = new List<string>();
 
             var registryManager = RegistryManager.CreateFromConnectionString(iotHubConnectionString);
 
-            var query = registryManager.CreateQuery("SELECT * FROM devices;");
-            while (query.HasMoreResults)
-            {
-                var page = await query.GetNextAsJsonAsync();
-                foreach (var json in page)
-                {
-                    jsons.Add(json);
-                }
-            }
+            var query = await registryManager.GetDevicesAsync(10);
+            // CreateQuery("SELECT * FROM devices;");
+            //while (query.HasMoreResults)
+            //{
+            //    var page = await query.GetNextAsJsonAsync();
+            //    foreach (var json in page)
+            //    {
+            //        jsons.Add(json);
+            //    }
+            //}
 
-            return jsons;
+            return query;
 
         }
 
